@@ -1,6 +1,9 @@
 # Audio Overview Studio
 
 A local-first web app for generating podcast-style audio from any document, article, or pasted text. Pick your hosts, assign them real voices, choose a format, and get a fully produced audio file — powered by any LLM you already have running.
+<img width="2097" height="423" alt="image" src="https://github.com/user-attachments/assets/ddb6e0b4-1618-4584-871d-5078e0421434" />
+<img width="696" height="864" alt="image" src="https://github.com/user-attachments/assets/c169a758-8630-4e5a-a636-6dcbb4e718ba" />
+<img width="1399" height="872" alt="image" src="https://github.com/user-attachments/assets/f6d4385d-e012-4485-a8e0-d79409a9c205" />
 
 ---
 
@@ -37,7 +40,7 @@ You feed it content. It writes a script between AI hosts, converts that script t
 | Audio stitching | pydub |
 
 ---
-<img width="2136" height="1218" alt="image" src="https://github.com/user-attachments/assets/fcfbad8e-699f-4e6d-b30a-3e7306933a9f" />
+
 
 ## Quick Start
 
