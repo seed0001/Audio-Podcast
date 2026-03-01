@@ -37,6 +37,7 @@ You feed it content. It writes a script between AI hosts, converts that script t
 | Audio stitching | pydub |
 
 ---
+<img width="2136" height="1218" alt="image" src="https://github.com/user-attachments/assets/fcfbad8e-699f-4e6d-b30a-3e7306933a9f" />
 
 ## Quick Start
 
