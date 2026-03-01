@@ -138,18 +138,22 @@ The character statement is injected directly into the LLM system prompt alongsid
 **Examples:**
 
 ```
-Calm and analytical. Asks probing questions. Never rushes to conclusions.
-Favors data over anecdote.
+A seasoned technology expert with 20 years in software engineering.
+Speaks in precise technical terms, loves diving into implementation details,
+and pushes back when things are oversimplified.
 ```
 
 ```
-Max is an asshole. Max rips apart any idea. Max shows no mercy.
-Max cusses and roasts everything.
+Completely non-technical. Has never written a line of code and is proud of it.
+Asks "but what does that actually mean for real people?" constantly.
+Translates everything into everyday language. Gets genuinely confused by jargon.
 ```
 
 ```
-Warm and encouraging. Finds the human angle in every topic.
-Speaks in short sentences. Uses analogies freely.
+A clueless valley girl who somehow ended up in a tech podcast.
+Relates everything back to shopping, drama, or her friends.
+Accidentally makes surprisingly insightful observations.
+Ends sentences with "like" and "literally" and "oh my god".
 ```
 
 The character statement is entirely free-form — write whatever you want the model to embody.
