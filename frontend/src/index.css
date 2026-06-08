@@ -1059,3 +1059,32 @@ input, select, textarea {
 .tts-no-voices {
   padding: 0.5rem 0;
 }
+
+/* Ollama not running warning */
+.ollama-error {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.35);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.ollama-error strong {
+  color: var(--error);
+}
+
+.ollama-error p {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.ollama-error code {
+  background: var(--surface);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  border: 1px solid var(--border);
+}

@@ -46,14 +46,20 @@ export function ProviderPanel({
 }: Props) {
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [ollamaLoading, setOllamaLoading] = useState(false)
+  const [ollamaError, setOllamaError] = useState<string | null>(null)
 
   useEffect(() => {
     if (provider !== 'local') return
     setOllamaLoading(true)
+    setOllamaError(null)
     fetch(`${API_BASE}/ollama-models`)
       .then((r) => r.json())
-      .then((d) => setOllamaModels(d.models || []))
-      .catch(() => setOllamaModels([]))
+      .then((d) => {
+        setOllamaModels(d.models || [])
+        if (d.error) setOllamaError(d.error)
+        else if (!d.models?.length) setOllamaError('No models found. Run: ollama pull llama3.2')
+      })
+      .catch(() => setOllamaError('Cannot reach Ollama. Is it installed and running?'))
       .finally(() => setOllamaLoading(false))
   }, [provider])
 
@@ -92,21 +98,34 @@ export function ProviderPanel({
       </div>
 
       {provider === 'local' && (
-        <div className="model-select-row">
-          <label>Ollama model</label>
-          <select
-            value={models.ollama}
-            onChange={(e) => setModel('ollama', e.target.value)}
-            disabled={ollamaLoading}
-          >
-            {ollamaOptions.length === 0 && (
-              <option value="">{ollamaLoading ? 'Loading…' : 'No models (run ollama pull)'}</option>
-            )}
-            {ollamaOptions.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        </div>
+        <>
+          {ollamaError && (
+            <div className="ollama-error">
+              <strong>⚠ Ollama not available</strong>
+              <p>{ollamaError}</p>
+              <p>
+                Install Ollama from <strong>ollama.com</strong>, then run{' '}
+                <code>ollama serve</code> and <code>ollama pull llama3.2</code>.
+                Or switch to <strong>Cloud</strong> above.
+              </p>
+            </div>
+          )}
+          <div className="model-select-row">
+            <label>Ollama model</label>
+            <select
+              value={models.ollama}
+              onChange={(e) => setModel('ollama', e.target.value)}
+              disabled={ollamaLoading}
+            >
+              {ollamaOptions.length === 0 && (
+                <option value="">{ollamaLoading ? 'Loading…' : 'No models found'}</option>
+              )}
+              {ollamaOptions.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+        </>
       )}
 
       {provider === 'cloud' && (

@@ -292,8 +292,12 @@ def get_llm_status(
             status["available"] = r.status_code == 200
             if not status["available"]:
                 status["error"] = "Ollama not reachable. Run: ollama serve"
-        except Exception as e:
-            status["error"] = str(e)
+        except Exception:
+            status["error"] = (
+                f"Cannot reach Ollama at {OLLAMA_HOST}. "
+                "Make sure Ollama is installed and running: https://ollama.com  "
+                "Then run: ollama serve"
+            )
         return status
 
     # Cloud
