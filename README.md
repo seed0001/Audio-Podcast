@@ -1,18 +1,16 @@
 # Audio Overview Studio
 
-A local-first web app for generating podcast-style audio from any document, article, or pasted text. Pick your hosts, assign them real voices, choose a format, and get a fully produced audio file — powered by any LLM you already have running.
+A local-first web app for generating podcast-style audio from any document, article, or pasted text. Pick your hosts, assign them voices, choose a format, and get a fully produced audio file — powered by any LLM you already have running.
 
 <img width="1399" height="872" alt="image" src="https://github.com/user-attachments/assets/f6d4385d-e012-4485-a8e0-d79409a9c205" />
 <img width="696" height="864" alt="image" src="https://github.com/user-attachments/assets/c169a758-8630-4e5a-a636-6dcbb4e718ba" />
 <img width="2097" height="423" alt="image" src="https://github.com/user-attachments/assets/ddb6e0b4-1618-4584-871d-5078e0421434" />
 
-
-
 ---
 
 ## What It Does
 
-You feed it content. It writes a script between AI hosts, converts that script to audio using your own voice samples, and hands you a downloadable WAV. Every word of every prompt it sends to the LLM is editable in the built-in settings page.
+You feed it content. It writes a script between AI hosts, converts that script to audio using your chosen TTS engine, and hands you a downloadable WAV. Every word of every prompt it sends to the LLM is editable in the built-in settings page.
 
 ---
 
@@ -20,9 +18,10 @@ You feed it content. It writes a script between AI hosts, converts that script t
 
 - [Stack](#stack)
 - [Quick Start](#quick-start)
-- [Sources — What You Can Feed It](#sources)
+- [TTS Providers](#tts-providers)
+- [Sources](#sources)
 - [Podcast Formats](#podcast-formats)
-- [Custom Voices](#custom-voices)
+- [Voices](#voices)
 - [LLM Providers](#llm-providers)
 - [Chat Panel](#chat-panel)
 - [Prompt Settings](#prompt-settings)
@@ -36,40 +35,46 @@ You feed it content. It writes a script between AI hosts, converts that script t
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18 + Vite + TypeScript |
+| Frontend | React 19 + Vite + TypeScript |
 | Backend | Python 3.11+ / FastAPI |
 | Script generation | Ollama (local), Gemini, Grok, OpenAI |
-| Voice synthesis | LuxTTS (XTTS-based, runs locally) |
+| Voice synthesis | OpenAI TTS, ElevenLabs, Kokoro (local), LuxTTS |
 | Audio stitching | pydub |
 
 ---
 
-
 ## Quick Start
 
-### First-time setup
+### Prerequisites
 
+- **Python 3.11+** — [python.org](https://www.python.org/downloads/)
+- **Node.js 18+** — [nodejs.org](https://nodejs.org) (LTS version recommended)
+- **Git**
+
+### One-command setup
+
+**Mac / Linux:**
 ```bash
-# 1. Backend
-cd backend
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # macOS / Linux
-pip install -r requirements.txt
-
-# 2. LuxTTS dependencies (adjust path to wherever temp_luxtts lives)
-pip install torch torchaudio
-pip install -r "../path/to/temp_luxtts/requirements.txt"
-
-# 3. Frontend
-cd ../frontend
-npm install
-
-# 4. Copy and fill in your keys
-cp .env.example ../.env
+git clone https://github.com/seed0001/Audio-Podcast
+cd Audio-Podcast
+bash setup.sh
 ```
 
-### Every time after that
+**Windows:**
+```bat
+git clone https://github.com/seed0001/Audio-Podcast
+cd Audio-Podcast
+setup.bat
+```
+
+The setup script will:
+- Create the Python virtual environment
+- Install all backend dependencies
+- Install Kokoro (local TTS engine — no API key needed)
+- Install frontend dependencies
+- Create your `.env` file from the template
+
+### Start the app
 
 ```bash
 python launch.py
@@ -79,12 +84,17 @@ This starts the backend on port **8001** and the frontend on port **5173** in on
 
 Open [http://localhost:5173](http://localhost:5173)
 
-### Manual start (if you prefer separate terminals)
+### Configure TTS
+
+Click **🎙 TTS Setup** in the top-right corner of the app to configure your voice engine. See [TTS Providers](#tts-providers) below for what each option requires.
+
+### Manual start (separate terminals)
 
 ```bash
 # Terminal 1 — backend
 cd backend
-.venv\Scripts\activate
+source .venv/bin/activate      # Mac / Linux
+# .venv\Scripts\activate       # Windows
 uvicorn main:app --reload --port 8001
 
 # Terminal 2 — frontend
@@ -94,53 +104,117 @@ npm run dev
 
 ---
 
+## TTS Providers
+
+TTS is the core of every podcast. The app supports four providers — configure them in the **🎙 TTS Setup** panel inside the app without touching any config files.
+
+### OpenAI TTS *(recommended for most users)*
+
+High-quality cloud voices. Six built-in voices with no setup beyond an API key.
+
+| | |
+|---|---|
+| **Requires** | `OPENAI_API_KEY` |
+| **Voices** | Alloy, Echo, Fable, Onyx, Nova, Shimmer |
+| **Models** | `tts-1` (fast) · `tts-1-hd` (highest quality, recommended) |
+| **Install** | Nothing extra — uses your existing OpenAI key |
+
+Get an API key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+
+---
+
+### ElevenLabs *(best podcast quality)*
+
+Studio-grade voices. Free tier includes 10,000 characters per month.
+
+| | |
+|---|---|
+| **Requires** | `ELEVENLABS_API_KEY` |
+| **Voices** | Rachel, Domi, Bella, Antoni, Josh, Arnold, Adam, Sam (+ more) |
+| **Models** | Turbo v2.5 · Multilingual v2 · Turbo v2 |
+| **Install** | Nothing extra |
+
+Get an API key at [elevenlabs.io](https://elevenlabs.io) → Profile → API Keys.
+
+---
+
+### Kokoro *(local, no API key needed)*
+
+Runs entirely on your machine. No internet required after install. Good quality across US and British English accents.
+
+| | |
+|---|---|
+| **Requires** | Nothing (no API key, no account) |
+| **Voices** | 11 voices — US & British English, male & female |
+| **Install — Mac / Linux** | `pip install kokoro[en]` |
+| **Install — Windows** | `pip install kokoro[en] misaki[en]` |
+
+The setup script installs Kokoro automatically. First generation may take a moment while the model loads into memory.
+
+---
+
+### LuxTTS *(advanced — voice cloning)*
+
+Clone a voice from your own MP3 sample. Requires a separate repo install and a GPU is strongly recommended.
+
+| | |
+|---|---|
+| **Requires** | Local clone of the LuxTTS repo + `torch` + `torchaudio` |
+| **Voices** | Your own uploaded MP3 samples |
+| **Install** | See [LuxTTS setup](#luxtts-setup) below |
+
+#### LuxTTS setup
+
+1. Clone the LuxTTS repo somewhere on your machine
+2. Install its dependencies: `pip install torch torchaudio` then `pip install -r /path/to/temp_luxtts/requirements.txt`
+3. In **🎙 TTS Setup**, enter the path to your `temp_luxtts` folder — or set `AOS_LUXTTS_PATH` in `.env`
+4. Upload voice samples (MP3) in the **Voices** panel
+
+---
+
 ## Sources
 
-You can combine any number of sources before generating. They are all concatenated into one context block.
+Combine any number of sources before generating. They are all concatenated into one context block for the LLM.
 
 | Method | How |
 |---|---|
 | **Upload file** | PDF, TXT, or Markdown. Text is extracted automatically from PDFs. |
 | **Paste text** | Click "Paste text", paste anything, click "Add as source". |
-| **Add URL** | Click "Add URL", enter any web address. The backend fetches the page, strips HTML, and adds the extracted text as a source. |
+| **Add URL** | Click "Add URL", enter any web address. The backend fetches and strips the HTML. |
 
-Click the **×** next to any source to remove it before generating.
+Click **×** next to any source to remove it before generating.
 
 ---
 
 ## Podcast Formats
 
-Select a format before generating. Each one changes the structure of the script sent to the LLM.
-
 | Format | Hosts | Description |
 |---|---|---|
 | **Deep Dive** | 2 | Two hosts have a full discussion — unpacking ideas, making connections, asking questions. Best for most content. |
-| **The Brief** | 1 | Single speaker delivers the key takeaways, fast. Under 2 minutes. |
+| **The Brief** | 1 | Single speaker delivers the key takeaways fast. |
 | **The Critique** | 2 | Two hosts give constructive feedback on the material. Good for evaluating documents, proposals, or code. |
 | **The Debate** | 2 | Two hosts argue different sides of the ideas in the source. |
-| **AI Council Review** | 3 | Gemini, Grok, and OpenAI each take a host role. Round 1: initial analysis. Round 2: debate. Round 3: synthesis. Requires all three cloud API keys. |
+| **AI Council Review** | 3 | Gemini, Grok, and OpenAI each take a host role. Round 1: analysis. Round 2: debate. Requires all three cloud API keys. |
 
 ### Focus (optional)
 
-Below the format selector there is a **Focus** field. Anything you type there is appended to the LLM prompt as an additional instruction — e.g. *"Emphasize the security implications"* or *"Keep it accessible for a non-technical audience"*.
+The **Focus** field below the format selector appends an extra instruction to the LLM prompt — e.g. *"Emphasize the security implications"* or *"Keep it accessible for a non-technical audience"*.
 
 ---
 
-## Custom Voices
+## Voices
 
-Voices are the core of what makes each episode feel different. Every voice is a combination of an **audio sample** (for cloning) and a **character statement** (for the LLM).
+### How voices work
 
-### How to add a voice
+The **Voices** panel shows all voices available from your active TTS provider. For cloud providers (OpenAI, ElevenLabs, Kokoro), built-in voices appear automatically once the provider is configured — no uploads needed.
 
-1. In the **Voices** panel, fill in:
-   - **Name** — what it's called in the UI (e.g. `Morgan`)
-   - **Character statement** — a description of how this character speaks, behaves, and what they care about
-2. Click **Select audio sample (MP3)** and pick a clean MP3 of that voice
-3. The voice is saved to `data/custom_voices/` and is immediately available
+### Built-in voices
+
+Once you configure a provider in **🎙 TTS Setup**, its voices populate the Voices panel automatically. Select Host 1, Host 2, and Host 3 from the dropdowns.
 
 ### Character statements
 
-The character statement is injected directly into the LLM system prompt alongside the script instructions. It shapes how the host speaks, what they focus on, and how they interact with the other host.
+Every voice can have a **character statement** — a description of how that host speaks, thinks, and behaves. This is injected directly into the LLM prompt and shapes the script writing.
 
 **Examples:**
 
@@ -153,43 +227,45 @@ and pushes back when things are oversimplified.
 ```
 Completely non-technical. Has never written a line of code and is proud of it.
 Asks "but what does that actually mean for real people?" constantly.
-Translates everything into everyday language. Gets genuinely confused by jargon.
+Translates everything into everyday language.
 ```
 
 ```
 A clueless valley girl who somehow ended up in a tech podcast.
 Relates everything back to shopping, drama, or her friends.
 Accidentally makes surprisingly insightful observations.
-Ends sentences with "like" and "literally" and "oh my god".
 ```
 
-The character statement is entirely free-form — write whatever you want the model to embody.
+Character statements are free-form — write whatever you want the model to embody.
 
 ### Voice assignment
 
-- **Deep Dive / Critique / Debate**: Assign Host 1 and Host 2
-- **The Brief**: Assign Host 1 only
-- **AI Council Review**: Assign Host 1 (Gemini), Host 2 (Grok), and Host 3 (OpenAI)
+- **Deep Dive / Critique / Debate**: Host 1 and Host 2
+- **The Brief**: Host 1 only
+- **AI Council Review**: Host 1 (Gemini), Host 2 (Grok), Host 3 (OpenAI)
 
-You can assign the same voice to multiple hosts or mix and match freely.
+### Custom voice uploads (LuxTTS only)
 
-### Voice storage
+When LuxTTS is the active provider, an upload form appears in the Voices panel:
 
-Voices are saved locally at:
+1. Enter a **Name** and optionally a **Character statement**
+2. Click **Select audio sample (MP3)** and pick a clean recording
+3. The voice is saved to `data/custom_voices/` and available immediately
 
+Uploaded voices are stored locally at:
 ```
 data/custom_voices/{voice_id}/
-  sample.mp3       ← your audio sample (used by LuxTTS for voice cloning)
-  config.json      ← name, character_statement, id
+  sample.mp3     ← your audio sample
+  config.json    ← name, character_statement, id
 ```
 
-The `data/` folder is gitignored — your voices never leave your machine unless you put them there.
+The `data/` folder is gitignored — your voices never leave your machine.
 
 ---
 
 ## LLM Providers
 
-Use the **Provider** toggle at the top to switch between local and cloud.
+Use the **Provider** toggle at the top of the app to switch between local and cloud.
 
 ### Local — Ollama
 
@@ -198,85 +274,48 @@ Runs completely offline. No API keys needed.
 1. Install [Ollama](https://ollama.com) and run `ollama serve`
 2. Pull a model: `ollama pull llama3.2`
 3. Select "Local (Ollama)" in the UI
-4. Pick your model from the dropdown (populated live from `ollama list`)
-
-**No timeout** — local generation runs as long as it needs to on slower machines.
+4. Pick your model from the dropdown
 
 ### Cloud
 
-| Provider | Key needed | Notes |
+| Provider | Key | Default model |
 |---|---|---|
-| **Gemini** | `GEMINI_API_KEY` | Default model: `gemini-2.5-flash` |
-| **Grok** | `XAI_API_KEY` | Default model: `grok-3` |
-| **OpenAI** | `OPENAI_API_KEY` | Default model: `gpt-4o` |
+| **Gemini** | `GEMINI_API_KEY` | `gemini-2.5-flash` |
+| **Grok** | `XAI_API_KEY` | `grok-3` |
+| **OpenAI** | `OPENAI_API_KEY` | `gpt-4o` |
 
 All three can override their model per-session from the Provider panel dropdown.
 
 ### AI Council Review
 
-This format requires all three cloud keys simultaneously. Each provider takes a distinct host role with its own personality (editable in Prompt Settings).
+Requires all three cloud keys simultaneously. Each provider takes a distinct host role with its own personality (editable in Prompt Settings).
 
 ---
 
 ## Chat Panel
 
-A live chat interface at the right side of the screen. Use it to talk to one, two, or three AI models at once, or to all three as the AI Council.
+A live chat interface at the right side of the screen. Talk to one, two, or three AI models at once, or all three as the AI Council. Text only — no TTS in chat mode.
 
-### Modes
-
-| Mode | Models active |
+| Mode | Models |
 |---|---|
-| **1 character** | One model, with a custom agent statement and provider you choose |
-| **2 characters** | Two models, each with their own provider and agent statement. Their replies appear side by side. |
-| **3 characters** | Three models, each independent |
-| **AI Council** | Gemini + Grok + OpenAI, each speaking with their council personality (editable in Prompt Settings) |
+| **1 character** | One model with a custom agent statement |
+| **2 characters** | Two models, replies appear side by side |
+| **3 characters** | Three independent models |
+| **AI Council** | Gemini + Grok + OpenAI with council personalities |
 
-### Agent statements in chat
-
-In 1/2/3 character modes, each character has an **agent statement** field — the same concept as voice character statements, but for chat. Write any role, personality, or instruction. It's injected as a profile note into that model's system prompt.
-
-Chat is **text only** — no TTS is generated in chat mode.
+**Agent statements** — In 1/2/3 character modes, each character has an agent statement field. Write any role, personality, or instruction.
 
 ---
 
 ## Prompt Settings
 
-Click the **⚙ Prompts** button in the top-right corner of the header to open the settings panel.
+Click **⚙ Prompts** in the header to open the settings panel. Every string sent to the LLM is editable here. Changes are saved to `data/prompts.json` and take effect on the next generation — no restart needed.
 
-Every string sent to the LLM is editable here. Changes are saved to `data/prompts.json` and take effect on the next generation — no restart needed.
-
-### Sections
-
-**Script Generation**
-- `Scriptwriter Role` — The opening identity instruction. Tells the LLM what it is.
-- `Output Instructions` — How to label speakers, how long the script should be, what formatting rules to follow.
-
-**Format Instructions**
-- One editable field per format: `Deep Dive`, `Brief`, `Critique`, `Debate`. The selected format's instruction is injected into the system prompt at generation time.
-
-**AI Council Review — Round 1 (Analysis)**
-- `Council Intro` — The shared context block all three counselors receive before the review starts.
-- `Host A / B / C (Analysis)` — What each counselor is instructed to do in the first round.
-
-**AI Council Review — Round 2 (Debate)**
-- `Host A / B / C (Debate)` — What each counselor is instructed to do in the second debate round.
-
-**Chat — AI Council Personalities**
-- `Gemini / Grok / OpenAI Personality` — The personality injected when those models are used in AI Council chat mode.
-
-**Chat**
-- `Chat Base System` — The base instruction appended to every chat conversation, after the conversation history.
-
-### Enhance with AI
-
-Every field has a **✦ Enhance** button. Click it to send the current contents of that field to the first available cloud LLM (Gemini → Grok → OpenAI), along with a meta-prompt asking it to rewrite the prompt to be clearer and more effective. The improved version replaces the field contents — you can edit it further before saving.
-
-### Other controls
-
-- **Blue dot** next to a label means that field has been modified from its default
-- **↩ Restore default** appears below any modified field to revert just that one
-- **Reset to Defaults** at the top reverts everything and saves
-- **Save All** persists all changes to `data/prompts.json`
+- **Blue dot** = field modified from default
+- **↩ Restore default** = revert that one field
+- **✦ Enhance** = send the field to an AI for rewriting
+- **Reset to Defaults** = revert everything
+- **Save All** = persist changes
 
 ---
 
@@ -288,17 +327,17 @@ All routes are prefixed with `/api`.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/sources/upload` | Upload a PDF, TXT, or MD file. Returns `source_id`. |
-| `POST` | `/api/sources/text` | Add pasted text. Body: `{ "text": "..." }`. Returns `source_id`. |
-| `POST` | `/api/sources/url` | Fetch a URL and extract text. Body: `{ "url": "..." }`. Returns `source_id`. |
-| `GET` | `/api/sources/{id}/text` | Get the extracted text for a source. |
+| `POST` | `/api/sources/upload` | Upload PDF, TXT, or MD. Returns `source_id`. |
+| `POST` | `/api/sources/text` | Add pasted text. Body: `{ "text": "..." }`. |
+| `POST` | `/api/sources/url` | Fetch a URL and extract text. Body: `{ "url": "..." }`. |
+| `GET` | `/api/sources/{id}/text` | Get extracted text for a source. |
 
 ### Generation
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/generate` | Generate podcast audio. See body schema below. |
-| `GET` | `/api/audio/{audio_id}` | Download generated WAV file. |
+| `POST` | `/api/generate` | Generate podcast audio. |
+| `GET` | `/api/audio/{audio_id}` | Download generated WAV. |
 
 **`POST /api/generate` body:**
 ```json
@@ -308,20 +347,30 @@ All routes are prefixed with `/api`.
   "provider": "local",
   "cloud_provider": "gemini",
   "ollama_model": "llama3.2",
-  "gemini_model": "gemini-2.5-flash",
-  "host1_voice_id": "abc",
-  "host2_voice_id": "def",
-  "host3_voice_id": "ghi",
+  "host1_voice_id": "openai:nova",
+  "host2_voice_id": "openai:onyx",
+  "host3_voice_id": "openai:alloy",
   "custom_prompt": "Focus on the risks"
 }
 ```
+
+Voice IDs follow the format `provider:voice_key` — e.g. `openai:nova`, `elevenlabs:21m00Tcm4TlvDq8ikWAM`, `kokoro:af_heart`.
 
 ### Voices
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/voices` | List all uploaded voices. |
-| `POST` | `/api/voices/upload` | Upload a new voice (multipart: `file`, `name`, `character_statement`). |
+| `GET` | `/api/voices` | List voices from active provider + custom uploads. |
+| `POST` | `/api/voices/upload` | Upload a custom voice MP3 (LuxTTS only). Multipart: `file`, `name`, `character_statement`. |
+
+### TTS Configuration
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/tts-config` | Get current TTS config and provider status. |
+| `PUT` | `/api/tts-config` | Save TTS config (active provider, API keys, model). |
+| `POST` | `/api/tts-test` | Generate a test audio clip. Body: `{ "voice_id": "openai:nova" }`. |
+| `GET` | `/api/tts-status` | Detailed status of all TTS providers. |
 
 ### Prompts
 
@@ -338,12 +387,11 @@ All routes are prefixed with `/api`.
 |---|---|---|
 | `POST` | `/api/chat` | Chat with one or multiple models. |
 
-### Status / Diagnostics
+### Status
 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/health` | Backend health check. |
-| `GET` | `/api/tts-status` | LuxTTS setup diagnostics. |
 | `GET` | `/api/llm-status` | LLM availability check. |
 | `GET` | `/api/ollama-models` | List installed Ollama models. |
 
@@ -351,15 +399,26 @@ All routes are prefixed with `/api`.
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` in the project root and fill in what you need.
+Copy `.env.example` to `.env` in the project root. Most settings can also be configured directly in the app's **🎙 TTS Setup** panel — no manual file editing required.
 
 ```env
-# LLM — Cloud providers (all optional, use what you have)
-GEMINI_API_KEY=
-XAI_API_KEY=
+# TTS provider (optional — can be set in TTS Setup UI instead)
+# Options: openai | elevenlabs | kokoro | luxtts
+AOS_TTS_PROVIDER=openai
+
+# OpenAI (TTS + LLM)
 OPENAI_API_KEY=
 
-# LLM — Local Ollama
+# ElevenLabs (TTS)
+ELEVENLABS_API_KEY=
+
+# Gemini (LLM)
+GEMINI_API_KEY=
+
+# Grok / xAI (LLM)
+XAI_API_KEY=
+
+# Local Ollama
 AOS_OLLAMA_HOST=http://localhost:11434
 AOS_OLLAMA_MODEL=llama3.2
 
@@ -368,40 +427,50 @@ AOS_GEMINI_MODEL=gemini-2.5-flash
 AOS_OPENAI_MODEL=gpt-4o
 AOS_GROK_MODEL=grok-3
 
-# LuxTTS path — point this to your temp_luxtts folder
-AOS_LUXTTS_PATH=../path/to/temp_luxtts
+# LuxTTS path (only needed if using LuxTTS provider)
+AOS_LUXTTS_PATH=/path/to/temp_luxtts
 
-# Storage (defaults to system temp)
+# Storage (defaults to system temp directory)
 AOS_UPLOAD_DIR=
 ```
 
-You do not need cloud keys to run the app — Ollama alone is sufficient for all formats except AI Council Review.
+You do not need any cloud keys to run the app. Kokoro (local TTS) + Ollama (local LLM) gives you a fully offline setup.
 
 ---
 
 ## Troubleshooting
 
-**LuxTTS not loading**
-Visit [http://localhost:8001/api/tts-status](http://localhost:8001/api/tts-status) — it will tell you exactly what is missing (wrong path, missing torch, etc.).
+**TTS not working**
+Open [http://localhost:8001/api/tts-status](http://localhost:8001/api/tts-status) — it shows the status of every provider with a specific error message. Or click **🎙 TTS Setup** in the app to see status indicators directly.
+
+**Kokoro not available after install**
+Restart the backend server after installing Kokoro — the import is checked at startup.
 
 ```bash
-# If torch is missing from the venv:
-cd backend
-.venv\Scripts\activate
-pip install torch torchaudio
+# Windows (in backend venv)
+pip install kokoro[en] misaki[en]
+
+# Mac / Linux
+pip install kokoro[en]
 ```
 
+**OpenAI / ElevenLabs key not recognized**
+Keys entered in the TTS Setup panel are saved to `data/tts_config.json`. Keys in `.env` always take precedence. If you recently changed a key in `.env`, restart the backend.
+
 **Ollama not available**
-Make sure `ollama serve` is running in a separate terminal, or that it started automatically. Check with:
+Make sure `ollama serve` is running. Check with:
 ```bash
 curl http://localhost:11434/api/tags
 ```
 
 **AI Council Review fails**
-All three keys — `GEMINI_API_KEY`, `XAI_API_KEY`, and `OPENAI_API_KEY` — must be set in `.env`. Check [http://localhost:8001/api/llm-status?format_type=ai_council_review](http://localhost:8001/api/llm-status?format_type=ai_council_review).
+All three keys — `GEMINI_API_KEY`, `XAI_API_KEY`, and `OPENAI_API_KEY` — must be set. Check [http://localhost:8001/api/llm-status?format_type=ai_council_review](http://localhost:8001/api/llm-status?format_type=ai_council_review).
 
 **Generation takes a long time**
-Normal for local Ollama on consumer hardware. The app has no timeout for local inference — it will wait as long as needed.
+Normal for local Ollama on consumer hardware. The app has no timeout for local inference — it will wait as long as needed. Cloud providers are much faster.
 
 **Port conflict on 8001**
 Edit `launch.py` and `frontend/vite.config.ts` to change the backend port, then update the proxy target in `vite.config.ts` to match.
+
+**`python launch.py` doesn't open the browser automatically**
+Open [http://localhost:5173](http://localhost:5173) manually.
