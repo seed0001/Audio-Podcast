@@ -4,6 +4,7 @@ python-multipart>=0.0.6
 httpx>=0.26.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
 
 # Document processing
 pypdf>=4.0.0
@@ -11,11 +12,28 @@ beautifulsoup4>=4.12.0
 requests>=2.31.0
 
 # LLM
-httpx>=0.26.0
 google-genai>=1.0.0
 
-# LuxTTS voice generation
+# Audio processing (required by all TTS providers)
 pydub>=0.25.0
 soundfile>=0.12.0
 numpy>=1.24.0
-# torch - install separately: pip install torch
+
+# --- TTS Providers ---
+# Pick at least one. All three can be installed together.
+
+# OpenAI TTS (cloud) — uses OPENAI_API_KEY
+# No extra install needed; uses httpx (already above)
+
+# ElevenLabs TTS (cloud) — uses ELEVENLABS_API_KEY
+# No extra install needed; uses httpx (already above)
+
+# Kokoro TTS (local, no API key needed) — recommended for offline use
+# Windows:  pip install kokoro[en] misaki[en]
+# Mac/Linux: pip install kokoro[en]
+# kokoro[en]
+
+# LuxTTS (advanced voice cloning) — requires separate repo + torch
+# 1. Clone https://github.com/YatharthS/LuxTTS into a local directory
+# 2. Set AOS_LUXTTS_PATH to that directory in .env or TTS Setup
+# 3. pip install torch torchaudio  (see pytorch.org for platform-specific command)

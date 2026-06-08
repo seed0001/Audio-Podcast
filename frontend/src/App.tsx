@@ -6,6 +6,7 @@ import { VoicesPanel } from './components/VoicesPanel'
 import { PreviewPanel } from './components/PreviewPanel'
 import { ChatPanel, type ChatMode } from './components/ChatPanel'
 import { SettingsPanel } from './components/SettingsPanel'
+import { TTSSetupPanel } from './components/TTSSetupPanel'
 import './App.css'
 
 export interface Source {
@@ -17,6 +18,8 @@ export interface Voice {
   id: string
   name: string
   character_statement: string
+  provider?: string
+  type?: 'builtin' | 'custom'
 }
 
 export type FormatType = 'deep_dive' | 'brief' | 'critique' | 'debate' | 'ai_council_review'
@@ -110,6 +113,7 @@ export function useGenerate(
 
 function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [ttsSetupOpen, setTtsSetupOpen] = useState(false)
   const [sources, setSources] = useState<Source[]>([])
   const [provider, setProvider] = useState<'local' | 'cloud'>('local')
   const [cloudProvider, setCloudProvider] = useState<CloudProvider>('gemini')
@@ -152,17 +156,34 @@ function App() {
           <h1>Audio Overview Studio</h1>
           <p>Podcast-style summaries from your documents. Custom voices.</p>
         </div>
-        <button
-          className="btn btn-outline settings-open-btn"
-          onClick={() => setSettingsOpen(true)}
-          title="Prompt Settings"
-        >
-          ⚙ Prompts
-        </button>
+        <div className="header-actions">
+          <button
+            className="btn btn-primary tts-setup-btn"
+            onClick={() => setTtsSetupOpen(true)}
+            title="Configure TTS providers"
+          >
+            🎙 TTS Setup
+          </button>
+          <button
+            className="btn btn-outline settings-open-btn"
+            onClick={() => setSettingsOpen(true)}
+            title="Prompt Settings"
+          >
+            ⚙ Prompts
+          </button>
+        </div>
       </header>
 
       {settingsOpen && (
         <SettingsPanel apiBase={API_BASE} onClose={() => setSettingsOpen(false)} />
+      )}
+
+      {ttsSetupOpen && (
+        <TTSSetupPanel
+          apiBase={API_BASE}
+          onClose={() => setTtsSetupOpen(false)}
+          onProviderChanged={refetchVoices}
+        />
       )}
 
       <main className="main">

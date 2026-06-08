@@ -13,11 +13,10 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-# Paths — override with AOS_LUXTTS_PATH env var if needed
+# Paths — set AOS_LUXTTS_PATH env var to point to your temp_luxtts directory
 _BACKEND = Path(__file__).resolve().parent
 _WORKSPACE = _BACKEND.parent
-_DEFAULT_LUXTTS = _WORKSPACE.parent / "New folder (33)" / "Adam GURU" / "temp_luxtts"
-_LUXTTS_PATH = Path(os.getenv("AOS_LUXTTS_PATH", str(_DEFAULT_LUXTTS)))
+_LUXTTS_PATH = Path(os.getenv("AOS_LUXTTS_PATH", "")) if os.getenv("AOS_LUXTTS_PATH") else Path("")
 _CUSTOM_VOICES_DIR = _WORKSPACE / "data" / "custom_voices"
 
 _model = None

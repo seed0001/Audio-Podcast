@@ -42,6 +42,8 @@ app.add_middleware(
 
 UPLOAD_DIR = Path(os.getenv("AOS_UPLOAD_DIR", tempfile.gettempdir())) / "aos_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+GENERATED_DIR = UPLOAD_DIR / "generated"
+GENERATED_DIR.mkdir(exist_ok=True)
 
 # Voices: user uploads only, saved in project data dir
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
@@ -92,6 +94,22 @@ class VoiceInfo(BaseModel):
     id: str
     name: str
     character_statement: str = ""
+    provider: str = "luxtts"
+    type: str = "custom"
+
+
+class TTSConfigUpdate(BaseModel):
+    active_provider: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    openai_model: Optional[str] = None
+    elevenlabs_api_key: Optional[str] = None
+    elevenlabs_model: Optional[str] = None
+    luxtts_path: Optional[str] = None
+
+
+class TTSTestRequest(BaseModel):
+    voice_id: str
+    text: str = "Welcome to the podcast. This is a test of the text to speech system."
 
 
 class ChatRequest(BaseModel):
@@ -212,9 +230,40 @@ def ollama_models():
 
 @app.get("/api/tts-status")
 def tts_status():
-    """Diagnostic endpoint for LuxTTS setup."""
-    from luxtts_service import get_tts_status
-    return get_tts_status()
+    """Return status of all TTS providers."""
+    from tts_service import get_all_status
+    return get_all_status()
+
+
+@app.get("/api/tts-config")
+def get_tts_config():
+    """Return current TTS config (API keys are masked)."""
+    from tts_service import get_all_status
+    return get_all_status()
+
+
+@app.put("/api/tts-config")
+def update_tts_config(body: TTSConfigUpdate):
+    """Save TTS configuration."""
+    from tts_service import save_config
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    save_config(updates)
+    from tts_service import get_all_status
+    return get_all_status()
+
+
+@app.post("/api/tts-test")
+async def test_tts(body: TTSTestRequest):
+    """Generate a short test audio clip with the specified voice."""
+    from tts_service import generate_speech
+    wav = await generate_speech(body.text, body.voice_id)
+    if not wav:
+        raise HTTPException(503, "TTS generation failed. Check provider config in TTS Setup.")
+    audio_id = os.urandom(8).hex()
+    out_path = GENERATED_DIR / f"{audio_id}.wav"
+    import shutil
+    shutil.move(str(wav), str(out_path))
+    return {"audio_url": f"/api/audio/{audio_id}"}
 
 
 @app.post("/api/chat")
@@ -295,8 +344,12 @@ def _load_voices() -> list[VoiceInfo]:
 
 @app.get("/api/voices")
 def list_voices():
-    """List available voices (user uploads only)."""
-    return {"voices": _load_voices()}
+    """List available voices: built-in voices for the active provider + custom uploads."""
+    from tts_service import get_all_voices
+    custom = [{"id": v.id, "name": v.name, "character_statement": v.character_statement}
+              for v in _load_voices()]
+    voices = get_all_voices(custom)
+    return {"voices": voices}
 
 
 @app.post("/api/voices/upload")
@@ -430,21 +483,18 @@ def _load_source_text(source_id: str) -> str:
     raise FileNotFoundError(f"Source not found: {source_id}")
 
 
-GENERATED_DIR = UPLOAD_DIR / "generated"
-GENERATED_DIR.mkdir(exist_ok=True)
-
 
 @app.post("/api/generate")
 async def generate_overview(req: GenerateRequest):
-    """Generate podcast script with LuxTTS voice and return audio."""
+    """Generate podcast script with TTS voice and return audio."""
     from llm_service import generate_script, parse_script
-    from luxtts_service import generate_speech, is_available
+    from tts_service import generate_speech, is_active_provider_available, get_all_status
 
-    if not is_available():
-        from luxtts_service import get_tts_status
-        st = get_tts_status()
-        msg = st.get("error") or "LuxTTS not available. Check /api/tts-status for details."
-        raise HTTPException(503, msg)
+    if not is_active_provider_available():
+        st = get_all_status()
+        provider = st["active_provider"]
+        reason = st["providers"].get(provider, {}).get("reason") or f"{provider} TTS not available."
+        raise HTTPException(503, f"TTS not ready: {reason}. Configure it in TTS Setup.")
 
     from llm_service import get_llm_status
     provider = (req.provider or "local").lower()
