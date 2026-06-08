@@ -440,6 +440,27 @@ You do not need any cloud keys to run the app. Kokoro (local TTS) + Ollama (loca
 
 ## Troubleshooting
 
+**"Connection refused" / ERR_CONNECTION_REFUSED (Mac errno 61)**
+The frontend can't reach the backend. The backend either crashed on startup or hasn't finished loading yet.
+
+1. Check the terminal output for a Python error — a missing package is the most common cause
+2. Make sure you ran `bash setup.sh` before `python3 launch.py`
+3. If you see `ModuleNotFoundError`, activate the venv and install the missing package:
+   ```bash
+   cd backend
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+4. Try starting the backend manually to see the full error:
+   ```bash
+   cd backend
+   source .venv/bin/activate
+   uvicorn main:app --port 8001
+   ```
+5. Visit [http://localhost:8001/health](http://localhost:8001/health) — if it loads, the backend is fine and the issue is the frontend proxy
+
+---
+
 **TTS not working**
 Open [http://localhost:8001/api/tts-status](http://localhost:8001/api/tts-status) — it shows the status of every provider with a specific error message. Or click **🎙 TTS Setup** in the app to see status indicators directly.
 
