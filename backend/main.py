@@ -80,6 +80,8 @@ class GenerateRequest(BaseModel):
     format: str = "deep_dive"  # deep_dive | brief | critique | debate | ai_council_review
     provider: str = "local"  # local | cloud
     cloud_provider: Optional[str] = None  # gemini | grok | openai (when provider=cloud)
+    local_llm_host: Optional[str] = None  # e.g. http://localhost:1234
+    local_llm_type: Optional[str] = None  # ollama | openai_compat
     ollama_model: Optional[str] = None
     gemini_model: Optional[str] = None
     grok_model: Optional[str] = None
@@ -117,6 +119,8 @@ class ChatRequest(BaseModel):
     messages: list[dict] = []
     provider: str = "local"
     cloud_provider: Optional[str] = None
+    local_llm_host: Optional[str] = None
+    local_llm_type: Optional[str] = None
     chat_providers: Optional[list[str]] = None
     character_providers: Optional[list[str]] = None  # per-char: "local" | "gemini" | "grok" | "openai"
     agent_statements: Optional[list[str]] = None  # per-char profile/agent statement
@@ -207,6 +211,20 @@ async def enhance_prompt_endpoint(body: EnhanceRequest):
             pass
 
     raise HTTPException(503, "No cloud API key available for enhancement (need GEMINI_API_KEY, XAI_API_KEY, or OPENAI_API_KEY)")
+
+
+@app.get("/api/local-llms")
+def local_llms():
+    """Auto-detect all running local LLM servers and their available models."""
+    from llm_service import detect_local_llms
+    return {"servers": detect_local_llms()}
+
+
+@app.get("/api/probe-llm")
+def probe_llm(host: str):
+    """Probe a custom local LLM host URL."""
+    from llm_service import probe_custom_host
+    return probe_custom_host(host)
 
 
 @app.get("/api/ollama-models")
@@ -499,7 +517,13 @@ async def generate_overview(req: GenerateRequest):
     from llm_service import get_llm_status
     provider = (req.provider or "local").lower()
     cloud_provider = (req.cloud_provider or "gemini").lower() if provider == "cloud" else None
-    llm_st = get_llm_status(provider=provider, cloud_provider=cloud_provider, format_type=req.format)
+    llm_st = get_llm_status(
+        provider=provider,
+        cloud_provider=cloud_provider,
+        format_type=req.format,
+        local_llm_host=req.local_llm_host,
+        local_llm_type=req.local_llm_type,
+    )
     if not llm_st.get("available"):
         raise HTTPException(503, llm_st.get("error") or "LLM not available.")
 
@@ -541,6 +565,8 @@ async def generate_overview(req: GenerateRequest):
             host2_character=host2_stmt or None,
             host3_character=host3_stmt or None,
             models=models,
+            local_llm_host=req.local_llm_host,
+            local_llm_type=req.local_llm_type,
         )
     except Exception as e:
         raise HTTPException(502, f"LLM failed: {e}")

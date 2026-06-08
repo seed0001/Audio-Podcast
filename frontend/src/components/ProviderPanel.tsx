@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { CloudProvider } from '../App'
 
 const API_BASE = '/api'
@@ -11,10 +11,24 @@ export interface ProviderModels {
 }
 
 export const DEFAULT_MODELS: ProviderModels = {
-  ollama: 'llama3.2',
+  ollama: '',
   gemini: 'gemini-2.5-flash',
   grok: 'grok-3',
   openai: 'gpt-4o',
+}
+
+export interface LocalLLMConfig {
+  host: string
+  type: 'ollama' | 'openai_compat'
+  model: string
+  name: string
+}
+
+interface DetectedServer {
+  name: string
+  host: string
+  type: 'ollama' | 'openai_compat'
+  models: string[]
 }
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash', 'gemini-1.5-pro']
@@ -25,9 +39,11 @@ interface Props {
   provider: 'local' | 'cloud'
   cloudProvider: CloudProvider
   models: ProviderModels
+  localLLM: LocalLLMConfig
   onProviderChange: (p: 'local' | 'cloud') => void
   onCloudProviderChange: (p: CloudProvider) => void
   onModelsChange: (m: ProviderModels) => void
+  onLocalLLMChange: (cfg: LocalLLMConfig) => void
 }
 
 const CLOUD_OPTIONS: { id: CloudProvider; label: string }[] = [
@@ -40,94 +56,226 @@ export function ProviderPanel({
   provider,
   cloudProvider,
   models,
+  localLLM,
   onProviderChange,
   onCloudProviderChange,
   onModelsChange,
+  onLocalLLMChange,
 }: Props) {
-  const [ollamaModels, setOllamaModels] = useState<string[]>([])
-  const [ollamaLoading, setOllamaLoading] = useState(false)
-  const [ollamaError, setOllamaError] = useState<string | null>(null)
+  const [servers, setServers] = useState<DetectedServer[]>([])
+  const [scanning, setScanning] = useState(false)
+  const [scanDone, setScanDone] = useState(false)
+  const [customHost, setCustomHost] = useState('')
+  const [probing, setProbing] = useState(false)
+  const [probeError, setProbeError] = useState<string | null>(null)
+
+  const scan = useCallback(async () => {
+    setScanning(true)
+    setScanDone(false)
+    try {
+      const r = await fetch(`${API_BASE}/local-llms`)
+      const d = await r.json()
+      const found: DetectedServer[] = d.servers || []
+      setServers(found)
+
+      // Auto-select first server if nothing is selected yet or previous selection is gone
+      if (found.length > 0) {
+        const stillValid = found.some((s) => s.host === localLLM.host)
+        if (!stillValid) {
+          const first = found[0]
+          onLocalLLMChange({
+            host: first.host,
+            type: first.type,
+            model: first.models[0] || '',
+            name: first.name,
+          })
+        }
+      }
+    } catch {
+      setServers([])
+    } finally {
+      setScanning(false)
+      setScanDone(true)
+    }
+  }, [localLLM.host, onLocalLLMChange])
 
   useEffect(() => {
-    if (provider !== 'local') return
-    setOllamaLoading(true)
-    setOllamaError(null)
-    fetch(`${API_BASE}/ollama-models`)
-      .then((r) => r.json())
-      .then((d) => {
-        setOllamaModels(d.models || [])
-        if (d.error) setOllamaError(d.error)
-        else if (!d.models?.length) setOllamaError('No models found. Run: ollama pull llama3.2')
-      })
-      .catch(() => setOllamaError('Cannot reach Ollama. Is it installed and running?'))
-      .finally(() => setOllamaLoading(false))
-  }, [provider])
+    if (provider === 'local') scan()
+  }, [provider]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setModel = (key: keyof ProviderModels, value: string) => {
-    onModelsChange({ ...models, [key]: value })
+  const handleSelectServer = (s: DetectedServer) => {
+    onLocalLLMChange({
+      host: s.host,
+      type: s.type,
+      model: s.models[0] || '',
+      name: s.name,
+    })
   }
 
-  const ollamaOptions = ollamaModels.length > 0
-    ? ollamaModels
-    : models.ollama ? [models.ollama] : []
+  const handleProbeCustom = async () => {
+    const host = customHost.trim()
+    if (!host) return
+    setProbing(true)
+    setProbeError(null)
+    try {
+      const r = await fetch(`${API_BASE}/probe-llm?host=${encodeURIComponent(host)}`)
+      const d = await r.json()
+      if (d.available) {
+        const server: DetectedServer = {
+          name: d.name,
+          host: d.host,
+          type: d.type,
+          models: d.models || [],
+        }
+        setServers((prev) => {
+          const exists = prev.some((s) => s.host === server.host)
+          return exists ? prev : [...prev, server]
+        })
+        onLocalLLMChange({
+          host: server.host,
+          type: server.type,
+          model: server.models[0] || '',
+          name: server.name,
+        })
+        setCustomHost('')
+      } else {
+        setProbeError(d.error || 'No LLM API found at that address.')
+      }
+    } catch {
+      setProbeError('Could not connect.')
+    } finally {
+      setProbing(false)
+    }
+  }
+
+  const selectedServer = servers.find((s) => s.host === localLLM.host)
+  const modelOptions = selectedServer?.models || (localLLM.model ? [localLLM.model] : [])
+
+  const setModel = (key: keyof ProviderModels, value: string) =>
+    onModelsChange({ ...models, [key]: value })
 
   return (
     <div>
       <h2>Provider</h2>
       <div className="provider-toggle">
         <label className={`provider-option ${provider === 'local' ? 'selected' : ''}`}>
-          <input
-            type="radio"
-            name="provider"
-            value="local"
-            checked={provider === 'local'}
-            onChange={() => onProviderChange('local')}
-          />
-          <span>Local (Ollama)</span>
+          <input type="radio" name="provider" value="local"
+            checked={provider === 'local'} onChange={() => onProviderChange('local')} />
+          <span>Local LLM</span>
         </label>
         <label className={`provider-option ${provider === 'cloud' ? 'selected' : ''}`}>
-          <input
-            type="radio"
-            name="provider"
-            value="cloud"
-            checked={provider === 'cloud'}
-            onChange={() => onProviderChange('cloud')}
-          />
+          <input type="radio" name="provider" value="cloud"
+            checked={provider === 'cloud'} onChange={() => onProviderChange('cloud')} />
           <span>Cloud</span>
         </label>
       </div>
 
+      {/* ── LOCAL ── */}
       {provider === 'local' && (
-        <>
-          {ollamaError && (
+        <div className="local-llm-section">
+          <div className="local-llm-header">
+            <span className="local-llm-label">Detected local LLM servers</span>
+            <button
+              className="btn btn-outline local-llm-scan-btn"
+              onClick={scan}
+              disabled={scanning}
+            >
+              {scanning ? 'Scanning…' : '⟳ Scan'}
+            </button>
+          </div>
+
+          {scanning && <p className="hint">Scanning common ports…</p>}
+
+          {!scanning && scanDone && servers.length === 0 && (
             <div className="ollama-error">
-              <strong>⚠ Ollama not available</strong>
-              <p>{ollamaError}</p>
+              <strong>⚠ No local LLM servers found</strong>
               <p>
-                Install Ollama from <strong>ollama.com</strong>, then run{' '}
-                <code>ollama serve</code> and <code>ollama pull llama3.2</code>.
-                Or switch to <strong>Cloud</strong> above.
+                Supported: <strong>Ollama</strong>, <strong>LM Studio</strong>, <strong>Jan</strong>,{' '}
+                <strong>llama.cpp</strong>, <strong>GPT4All</strong>, and any OpenAI-compatible server.
+              </p>
+              <p>
+                Start one of those apps, then click <strong>⟳ Scan</strong>. Or enter a custom address below.
+                You can also switch to <strong>Cloud</strong> above.
               </p>
             </div>
           )}
-          <div className="model-select-row">
-            <label>Ollama model</label>
-            <select
-              value={models.ollama}
-              onChange={(e) => setModel('ollama', e.target.value)}
-              disabled={ollamaLoading}
-            >
-              {ollamaOptions.length === 0 && (
-                <option value="">{ollamaLoading ? 'Loading…' : 'No models found'}</option>
+
+          {servers.length > 0 && (
+            <div className="local-server-list">
+              {servers.map((s) => {
+                const isSelected = localLLM.host === s.host
+                return (
+                  <button
+                    key={s.host}
+                    className={`local-server-card ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleSelectServer(s)}
+                  >
+                    <span className="local-server-name">
+                      {isSelected ? '● ' : '○ '}{s.name}
+                    </span>
+                    <span className="local-server-host">{s.host}</span>
+                    <span className="local-server-models">
+                      {s.models.length > 0
+                        ? `${s.models.length} model${s.models.length !== 1 ? 's' : ''}`
+                        : 'no models listed'}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Model selector for selected server */}
+          {localLLM.host && (
+            <div className="model-select-row" style={{ marginTop: '0.75rem' }}>
+              <label>Model</label>
+              {modelOptions.length > 0 ? (
+                <select
+                  value={localLLM.model}
+                  onChange={(e) => onLocalLLMChange({ ...localLLM, model: e.target.value })}
+                >
+                  {modelOptions.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  className="local-model-input"
+                  placeholder="Enter model name (e.g. llama3.2)"
+                  value={localLLM.model}
+                  onChange={(e) => onLocalLLMChange({ ...localLLM, model: e.target.value })}
+                />
               )}
-              {ollamaOptions.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+            </div>
+          )}
+
+          {/* Custom host input */}
+          <div className="local-custom-host">
+            <label className="local-llm-label">Custom server address</label>
+            <div className="local-custom-row">
+              <input
+                type="text"
+                className="local-host-input"
+                placeholder="http://localhost:8080"
+                value={customHost}
+                onChange={(e) => setCustomHost(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleProbeCustom()}
+              />
+              <button
+                className="btn btn-outline"
+                onClick={handleProbeCustom}
+                disabled={probing || !customHost.trim()}
+              >
+                {probing ? '…' : 'Connect'}
+              </button>
+            </div>
+            {probeError && <p className="upload-error">{probeError}</p>}
           </div>
-        </>
+        </div>
       )}
 
+      {/* ── CLOUD ── */}
       {provider === 'cloud' && (
         <>
           <div className="cloud-provider-select">
@@ -137,9 +285,7 @@ export function ProviderPanel({
               onChange={(e) => onCloudProviderChange(e.target.value as CloudProvider)}
             >
               {CLOUD_OPTIONS.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
+                <option key={o.id} value={o.id}>{o.label}</option>
               ))}
             </select>
           </div>
@@ -148,25 +294,19 @@ export function ProviderPanel({
             <div className="model-select-row">
               <span className="model-label">Gemini</span>
               <select value={models.gemini} onChange={(e) => setModel('gemini', e.target.value)}>
-                {GEMINI_MODELS.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
+                {GEMINI_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div className="model-select-row">
               <span className="model-label">Grok</span>
               <select value={models.grok} onChange={(e) => setModel('grok', e.target.value)}>
-                {GROK_MODELS.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
+                {GROK_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div className="model-select-row">
               <span className="model-label">OpenAI</span>
               <select value={models.openai} onChange={(e) => setModel('openai', e.target.value)}>
-                {OPENAI_MODELS.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
+                {OPENAI_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
           </div>

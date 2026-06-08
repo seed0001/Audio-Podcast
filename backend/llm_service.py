@@ -15,6 +15,81 @@ import httpx
 
 OLLAMA_HOST = os.getenv("AOS_OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("AOS_OLLAMA_MODEL", "llama3.2")
+
+# Known local LLM servers to probe during auto-detection
+_LOCAL_SERVERS = [
+    {"name": "Ollama",              "host": "http://localhost:11434", "type": "ollama"},
+    {"name": "LM Studio",           "host": "http://localhost:1234",  "type": "openai_compat"},
+    {"name": "Jan",                 "host": "http://localhost:1337",  "type": "openai_compat"},
+    {"name": "llama.cpp",           "host": "http://localhost:8080",  "type": "openai_compat"},
+    {"name": "LocalAI",             "host": "http://localhost:8081",  "type": "openai_compat"},
+    {"name": "GPT4All",             "host": "http://localhost:4891",  "type": "openai_compat"},
+    {"name": "Text Gen WebUI",      "host": "http://localhost:5000",  "type": "openai_compat"},
+    {"name": "Kobold.cpp",          "host": "http://localhost:5001",  "type": "openai_compat"},
+    {"name": "Open WebUI",          "host": "http://localhost:3000",  "type": "openai_compat"},
+]
+
+
+def detect_local_llms() -> list[dict]:
+    """Probe common local LLM server ports. Returns list of running servers with their models."""
+    import httpx
+    found = []
+    for s in _LOCAL_SERVERS:
+        try:
+            with httpx.Client(timeout=1.5) as client:
+                if s["type"] == "ollama":
+                    r = client.get(f"{s['host']}/api/tags")
+                    if r.status_code == 200:
+                        data = r.json()
+                        models = sorted({
+                            m.get("name") or m.get("model", "")
+                            for m in (data.get("models") or [])
+                            if m.get("name") or m.get("model")
+                        })
+                        found.append({**s, "models": models})
+                else:
+                    r = client.get(f"{s['host']}/v1/models")
+                    if r.status_code == 200:
+                        data = r.json()
+                        models = sorted({
+                            m.get("id", "")
+                            for m in (data.get("data") or [])
+                            if m.get("id")
+                        })
+                        found.append({**s, "models": models})
+        except Exception:
+            pass
+    return found
+
+
+def probe_custom_host(host: str) -> dict:
+    """Probe a user-supplied host URL and return its type and models."""
+    import httpx
+    host = host.rstrip("/")
+    try:
+        with httpx.Client(timeout=3.0) as client:
+            # Try Ollama first
+            try:
+                r = client.get(f"{host}/api/tags")
+                if r.status_code == 200:
+                    data = r.json()
+                    models = sorted({
+                        m.get("name") or m.get("model", "")
+                        for m in (data.get("models") or [])
+                        if m.get("name") or m.get("model")
+                    })
+                    return {"host": host, "type": "ollama", "name": "Custom (Ollama)", "models": models, "available": True}
+            except Exception:
+                pass
+            # Try OpenAI-compatible
+            r = client.get(f"{host}/v1/models")
+            if r.status_code == 200:
+                data = r.json()
+                models = sorted({m.get("id", "") for m in (data.get("data") or []) if m.get("id")})
+                return {"host": host, "type": "openai_compat", "name": "Custom (OpenAI-compatible)", "models": models, "available": True}
+    except Exception as e:
+        return {"host": host, "type": "unknown", "name": "Custom", "models": [], "available": False, "error": str(e)}
+    return {"host": host, "type": "unknown", "name": "Custom", "models": [], "available": False, "error": "No LLM API detected at this address"}
 GEMINI_MODEL = os.getenv("AOS_GEMINI_MODEL", "gemini-2.5-flash")
 OPENAI_MODEL = os.getenv("AOS_OPENAI_MODEL", "gpt-4o")
 GROK_MODEL = os.getenv("AOS_GROK_MODEL", "grok-3")
@@ -36,11 +111,17 @@ def _call_provider(
     user: str,
     timeout: float = 120.0,
     models: Optional[dict] = None,
+    local_llm_host: Optional[str] = None,
+    local_llm_type: Optional[str] = None,
 ):
     """Route to correct provider with optional model override."""
     model = _get_model(provider, cloud_provider, models)
     if provider == "local":
-        return _generate_ollama(system, user, timeout, model=model)
+        llm_type = local_llm_type or "ollama"
+        llm_host = local_llm_host or OLLAMA_HOST
+        if llm_type == "openai_compat":
+            return _generate_openai_compat(system, user, timeout, base_url=llm_host, model=model or "default")
+        return _generate_ollama(system, user, timeout, model=model, host=llm_host)
     if cloud_provider == "gemini":
         return _generate_gemini(system, user, timeout, model=model)
     if cloud_provider == "grok":
@@ -61,6 +142,8 @@ async def generate_script(
     host3_character: Optional[str] = None,
     timeout: float = 120.0,
     models: Optional[dict] = None,
+    local_llm_host: Optional[str] = None,
+    local_llm_type: Optional[str] = None,
 ) -> str:
     """
     Generate podcast script. Returns raw text with Host A/B/C lines.
@@ -104,7 +187,12 @@ Format: {instructions}
 
 Write the podcast script:"""
 
-    return await _call_provider(provider, cloud_provider, system, user, timeout, models=models)
+    return await _call_provider(
+        provider, cloud_provider, system, user, timeout,
+        models=models,
+        local_llm_host=local_llm_host,
+        local_llm_type=local_llm_type,
+    )
 
 
 async def _generate_council_review(
@@ -182,19 +270,46 @@ Source material:
     return "\n".join(f"{host_map.get(s, 'Host A')}: {t}" for s, t in lines)
 
 
-async def _generate_ollama(system: str, user: str, timeout: float, model: Optional[str] = None) -> str:
+async def _generate_ollama(
+    system: str, user: str, timeout: float,
+    model: Optional[str] = None,
+    host: Optional[str] = None,
+) -> str:
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
-    url = f"{OLLAMA_HOST.rstrip('/')}/api/chat"
+    base = (host or OLLAMA_HOST).rstrip("/")
+    url = f"{base}/api/chat"
     payload = {"model": model or OLLAMA_MODEL, "messages": messages, "stream": False}
-    # No timeout for local Ollama — let it run as long as needed on slower machines
     async with httpx.AsyncClient(timeout=None) as client:
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
         data = resp.json()
     return ((data.get("message") or {}).get("content") or "").strip()
+
+
+async def _generate_openai_compat(
+    system: str, user: str, timeout: float,
+    base_url: str, model: str,
+) -> str:
+    """OpenAI-compatible /v1/chat/completions — works with LM Studio, Jan, llama.cpp, etc."""
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+    url = f"{base_url.rstrip('/')}/v1/chat/completions"
+    payload = {"model": model, "messages": messages, "stream": False}
+    # Most local servers don't require auth, but some accept a dummy key
+    headers = {"Authorization": "Bearer local", "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=None) as client:
+        resp = await client.post(url, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+    content = (((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+    if not content:
+        raise RuntimeError("Empty response from local LLM")
+    return content
 
 
 async def _generate_gemini(system: str, user: str, timeout: float, model: Optional[str] = None) -> str:
@@ -266,6 +381,7 @@ def get_llm_status(
     provider: str = "local",
     cloud_provider: Optional[str] = None,
     format_type: Optional[str] = None,
+    **kwargs: Any,
 ) -> dict:
     """Check availability for the selected provider (or all three for council)."""
     status: dict = {"provider": provider, "cloud_provider": cloud_provider, "available": False, "error": None}
@@ -284,19 +400,22 @@ def get_llm_status(
         return status
 
     if provider == "local":
-        status["ollama_host"] = OLLAMA_HOST
-        status["ollama_model"] = OLLAMA_MODEL
+        local_host = kwargs.get("local_llm_host") or OLLAMA_HOST
+        local_type = kwargs.get("local_llm_type") or "ollama"
+        status["local_host"] = local_host
         try:
-            with httpx.Client(timeout=5.0) as client:
-                r = client.get(f"{OLLAMA_HOST.rstrip('/')}/api/tags")
+            with httpx.Client(timeout=3.0) as client:
+                if local_type == "ollama":
+                    r = client.get(f"{local_host.rstrip('/')}/api/tags")
+                else:
+                    r = client.get(f"{local_host.rstrip('/')}/v1/models")
             status["available"] = r.status_code == 200
             if not status["available"]:
-                status["error"] = "Ollama not reachable. Run: ollama serve"
+                status["error"] = f"LLM server at {local_host} returned {r.status_code}"
         except Exception:
             status["error"] = (
-                f"Cannot reach Ollama at {OLLAMA_HOST}. "
-                "Make sure Ollama is installed and running: https://ollama.com  "
-                "Then run: ollama serve"
+                f"Cannot reach local LLM at {local_host}. "
+                "Make sure your LLM server is running."
             )
         return status
 

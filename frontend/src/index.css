@@ -1060,6 +1060,114 @@ input, select, textarea {
   padding: 0.5rem 0;
 }
 
+/* Local LLM picker */
+.local-llm-section {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.local-llm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.local-llm-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.local-llm-scan-btn {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+}
+
+.local-server-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.local-server-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  font-size: 0.85rem;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.local-server-card:hover {
+  border-color: var(--accent);
+}
+
+.local-server-card.selected {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.local-server-name {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.local-server-host {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.local-server-models {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.local-model-input {
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.local-custom-host {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.local-custom-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.local-host-input {
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+}
+
 /* Ollama not running warning */
 .ollama-error {
   margin-top: 0.75rem;

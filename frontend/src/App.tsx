@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ProviderPanel, DEFAULT_MODELS, type ProviderModels } from './components/ProviderPanel'
+import { ProviderPanel, DEFAULT_MODELS, type ProviderModels, type LocalLLMConfig } from './components/ProviderPanel'
 import { SourcesPanel } from './components/SourcesPanel'
 import { FormatPanel } from './components/FormatPanel'
 import { VoicesPanel } from './components/VoicesPanel'
@@ -66,6 +66,7 @@ export function useGenerate(
   provider: 'local' | 'cloud',
   cloudProvider: CloudProvider | null,
   models: ProviderModels,
+  localLLM: LocalLLMConfig,
   host1Voice: string,
   host2Voice: string | null,
   host3Voice: string | null,
@@ -90,7 +91,9 @@ export function useGenerate(
           format,
           provider: provider,
           cloud_provider: provider === 'cloud' ? cloudProvider : null,
-          ollama_model: models.ollama,
+          local_llm_host: provider === 'local' ? localLLM.host || undefined : undefined,
+          local_llm_type: provider === 'local' ? localLLM.type || undefined : undefined,
+          ollama_model: provider === 'local' ? localLLM.model || undefined : models.ollama,
           gemini_model: models.gemini,
           grok_model: models.grok,
           openai_model: models.openai,
@@ -124,6 +127,9 @@ function App() {
   const [customPrompt, setCustomPrompt] = useState('')
   const [chatMode, setChatMode] = useState<ChatMode>('1')
   const [models, setModels] = useState<ProviderModels>(() => ({ ...DEFAULT_MODELS }))
+  const [localLLM, setLocalLLM] = useState<LocalLLMConfig>({
+    host: '', type: 'ollama', model: '', name: '',
+  })
 
   const { voices, loading, refetch: refetchVoices } = useVoices()
   const { generate, status, result, error } = useGenerate(
@@ -132,6 +138,7 @@ function App() {
     provider,
     provider === 'cloud' ? cloudProvider : null,
     models,
+    localLLM,
     host1Voice,
     format !== 'brief' ? host2Voice : '',
     format === 'ai_council_review' ? host3Voice : '',
@@ -192,9 +199,11 @@ function App() {
             provider={provider}
             cloudProvider={cloudProvider}
             models={models}
+            localLLM={localLLM}
             onProviderChange={setProvider}
             onCloudProviderChange={setCloudProvider}
             onModelsChange={setModels}
+            onLocalLLMChange={setLocalLLM}
           />
         </section>
         <section className="panel sources-panel">
