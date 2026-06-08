@@ -303,6 +303,29 @@ input, select, textarea {
   margin-bottom: 0.5rem;
 }
 
+.voice-slot {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.voice-slot:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.persona-field {
+  margin-top: 0.4rem;
+}
+
+.persona-field label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
 .voice-upload {
   margin-top: 1rem;
   padding-top: 0.75rem;

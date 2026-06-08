@@ -89,6 +89,9 @@ class GenerateRequest(BaseModel):
     host1_voice_id: str
     host2_voice_id: Optional[str] = None
     host3_voice_id: Optional[str] = None  # for ai_council_review
+    host1_character: Optional[str] = None  # persona / character statement
+    host2_character: Optional[str] = None
+    host3_character: Optional[str] = None
     custom_prompt: Optional[str] = None
 
 
@@ -538,14 +541,21 @@ async def generate_overview(req: GenerateRequest):
     if not source_text.strip():
         raise HTTPException(400, "No text content in sources.")
 
-    # Load character statements for selected voices
+    # Character statements: prefer values sent directly in the request (works for all
+    # TTS providers), fall back to stored config for LuxTTS uploaded voices.
     voices_by_id = {v.id: v for v in _load_voices()}
-    host1_char = voices_by_id.get(req.host1_voice_id, None)
-    host2_char = voices_by_id.get(req.host2_voice_id or req.host1_voice_id, None)
-    host3_char = voices_by_id.get(req.host3_voice_id or req.host1_voice_id, None)
-    host1_stmt = host1_char.character_statement if host1_char else None
-    host2_stmt = host2_char.character_statement if host2_char else None
-    host3_stmt = host3_char.character_statement if host3_char else None
+
+    def _char_stmt(voice_id: Optional[str], direct: Optional[str]) -> Optional[str]:
+        if direct and direct.strip():
+            return direct.strip()
+        # Try bare id (luxtts uploads stored without prefix)
+        bare_id = voice_id.split(":", 1)[-1] if voice_id and ":" in voice_id else voice_id
+        v = voices_by_id.get(bare_id) or voices_by_id.get(voice_id or "")
+        return v.character_statement if v and v.character_statement else None
+
+    host1_stmt = _char_stmt(req.host1_voice_id, req.host1_character)
+    host2_stmt = _char_stmt(req.host2_voice_id or req.host1_voice_id, req.host2_character)
+    host3_stmt = _char_stmt(req.host3_voice_id or req.host1_voice_id, req.host3_character)
 
     # Generate script
     models = {

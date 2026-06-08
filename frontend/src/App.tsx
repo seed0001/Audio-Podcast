@@ -70,6 +70,9 @@ export function useGenerate(
   host1Voice: string,
   host2Voice: string | null,
   host3Voice: string | null,
+  host1Character: string,
+  host2Character: string,
+  host3Character: string,
   customPrompt: string | null
 ) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -100,6 +103,9 @@ export function useGenerate(
           host1_voice_id: host1Voice,
           host2_voice_id: format !== 'brief' ? host2Voice || host1Voice : null,
           host3_voice_id: format === 'ai_council_review' ? host3Voice || host2Voice || host1Voice : null,
+          host1_character: host1Character || undefined,
+          host2_character: host2Character || undefined,
+          host3_character: host3Character || undefined,
           custom_prompt: customPrompt || undefined,
         }),
       })
@@ -124,6 +130,9 @@ function App() {
   const [host1Voice, setHost1Voice] = useState('')
   const [host2Voice, setHost2Voice] = useState('')
   const [host3Voice, setHost3Voice] = useState('')
+  const [host1Character, setHost1Character] = useState('')
+  const [host2Character, setHost2Character] = useState('')
+  const [host3Character, setHost3Character] = useState('')
   const [customPrompt, setCustomPrompt] = useState('')
   const [chatMode, setChatMode] = useState<ChatMode>('1')
   const [models, setModels] = useState<ProviderModels>(() => ({ ...DEFAULT_MODELS }))
@@ -142,6 +151,9 @@ function App() {
     host1Voice,
     format !== 'brief' ? host2Voice : '',
     format === 'ai_council_review' ? host3Voice : '',
+    host1Character,
+    host2Character,
+    host3Character,
     customPrompt || null
   )
 
@@ -227,9 +239,15 @@ function App() {
             host1Voice={host1Voice}
             host2Voice={host2Voice}
             host3Voice={host3Voice}
+            host1Character={host1Character}
+            host2Character={host2Character}
+            host3Character={host3Character}
             onHost1Change={setHost1Voice}
             onHost2Change={setHost2Voice}
             onHost3Change={setHost3Voice}
+            onHost1CharacterChange={setHost1Character}
+            onHost2CharacterChange={setHost2Character}
+            onHost3CharacterChange={setHost3Character}
             onVoiceUploaded={refetchVoices}
             apiBase={API_BASE}
           />
