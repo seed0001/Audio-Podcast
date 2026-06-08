@@ -265,6 +265,7 @@ function App() {
         <section className="panel chat-panel-wrapper">
           <ChatPanel
             models={models}
+            localLLM={localLLM}
             chatMode={chatMode}
             onChatModeChange={setChatMode}
           />

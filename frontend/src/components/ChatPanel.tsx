@@ -1,35 +1,30 @@
 import { useState, useRef, useEffect } from 'react'
 import type { CloudProvider } from '../App'
-import type { ProviderModels } from './ProviderPanel'
+import type { ProviderModels, LocalLLMConfig } from './ProviderPanel'
 
 export type ChatMode = '1' | '2' | '3' | 'ai_council'
 
 export type ChatProvider = 'local' | CloudProvider
 
-const CHAT_PROVIDER_OPTIONS: { id: ChatProvider; label: string }[] = [
-  { id: 'local', label: 'Local (Ollama)' },
-  { id: 'gemini', label: 'Gemini' },
-  { id: 'grok', label: 'Grok' },
-  { id: 'openai', label: 'OpenAI' },
-]
-
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
-  speaker?: string // for multi-model: 'Gemini' | 'Grok' | 'OpenAI'
+  speaker?: string
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
 interface Props {
   models: ProviderModels
+  localLLM: LocalLLMConfig
   chatMode: ChatMode
   onChatModeChange: (m: ChatMode) => void
 }
 
 export function ChatPanel({
   models,
+  localLLM,
   chatMode,
   onChatModeChange,
 }: Props) {
@@ -39,7 +34,7 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  // Per-character agent statements and provider selection (1/2/3 char modes)
+  // Per-character agent statements and provider selection
   const [char1Statement, setChar1Statement] = useState('')
   const [char1Provider, setChar1Provider] = useState<ChatProvider>('local')
   const [char2Statement, setChar2Statement] = useState('')
@@ -50,6 +45,20 @@ export function ChatPanel({
   useEffect(() => {
     listRef.current?.scrollTo(0, listRef.current.scrollHeight)
   }, [messages])
+
+  // Build provider options dynamically — local label shows actual server name
+  const localLabel = localLLM.name
+    ? `Local (${localLLM.name})`
+    : localLLM.host
+    ? `Local (${localLLM.host})`
+    : 'Local LLM'
+
+  const CHAT_PROVIDER_OPTIONS: { id: ChatProvider; label: string }[] = [
+    { id: 'local', label: localLabel },
+    { id: 'gemini', label: 'Gemini' },
+    { id: 'grok', label: 'Grok' },
+    { id: 'openai', label: 'OpenAI' },
+  ]
 
   const getCharProviders = (): ChatProvider[] => {
     if (chatMode === '1') return [char1Provider]
@@ -84,6 +93,9 @@ export function ChatPanel({
         gemini_model: models.gemini,
         grok_model: models.grok,
         openai_model: models.openai,
+        // Pass local LLM config so chat uses the same server as the main panel
+        local_llm_host: localLLM.host || undefined,
+        local_llm_type: localLLM.type || undefined,
       }
 
       if (chatMode === '1') {
@@ -115,7 +127,7 @@ export function ChatPanel({
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }))
         const msg = err.detail || err.error || res.statusText || 'Chat failed'
-        throw new Error(`Chat API ${res.status}: ${msg}. Ensure backend is running on port 8000.`)
+        throw new Error(`Chat API ${res.status}: ${msg}`)
       }
 
       const data = await res.json()
@@ -159,7 +171,13 @@ export function ChatPanel({
     }
   }
 
-  const renderCharConfig = (label: string, statement: string, onStatement: (v: string) => void, prov: ChatProvider, onProv: (p: ChatProvider) => void) => (
+  const renderCharConfig = (
+    label: string,
+    statement: string,
+    onStatement: (v: string) => void,
+    prov: ChatProvider,
+    onProv: (p: ChatProvider) => void
+  ) => (
     <div key={label} className="chat-char-config">
       <div className="chat-char-header">{label}</div>
       <div className="model-select-row">
